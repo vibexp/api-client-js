@@ -1,6 +1,6 @@
 {
   "name": "@vibexp/api-client",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Typed VibeXP API client generated from the OpenAPI spec (openapi-fetch main entrypoint, axios SDK at ./axios)",
   "license": "MIT",
   "repository": {
