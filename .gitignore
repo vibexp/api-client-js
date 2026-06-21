@@ -1,0 +1,15 @@
+# Generated source artifacts — produced at build time from the bundled OpenAPI
+# spec (npm run generate). Never committed; only the hand-written src/index.ts,
+# src/axios-entry.ts and smoke/ are tracked. dist/ is built fresh at publish time.
+src/schema.ts
+src/axios/
+openapi.bundled.yaml
+
+# Backend repo checked out for spec generation (CI / local; see README).
+spec-src/
+
+# Build output (published via package.json "files", built in CI before publish).
+dist/
+
+# Dependencies
+node_modules/

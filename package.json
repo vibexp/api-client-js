@@ -1,0 +1,51 @@
+{
+  "name": "@vibexp/api-client",
+  "version": "0.0.0",
+  "description": "Typed VibeXP API client generated from the OpenAPI spec (openapi-fetch main entrypoint, axios SDK at ./axios)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vibexp/api-client-js.git"
+  },
+  "homepage": "https://github.com/vibexp/api-client-js#readme",
+  "bugs": {
+    "url": "https://github.com/vibexp/api-client-js/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./axios": {
+      "types": "./dist/axios-entry.d.ts",
+      "default": "./dist/axios-entry.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "bundle-spec": "redocly bundle \"${VIBEXP_SPEC:-spec-src/backend/openapi.yaml}\" -o openapi.bundled.yaml",
+    "generate": "npm run bundle-spec && openapi-typescript openapi.bundled.yaml -o src/schema.ts && openapi-ts -i openapi.bundled.yaml -o src/axios -c @hey-api/client-axios",
+    "build": "npm run generate && tsc -p tsconfig.json",
+    "smoke": "npm run build && tsc -p tsconfig.smoke.json",
+    "clean": "rm -rf dist src/schema.ts src/axios openapi.bundled.yaml"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.98.2",
+    "@redocly/cli": "2.32.0",
+    "axios": "1.17.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

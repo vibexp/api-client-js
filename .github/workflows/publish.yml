@@ -1,0 +1,88 @@
+name: Publish
+
+# Release-driven publish: creating a GitHub Release (tag `v*`) generates the
+# client from the backend spec and publishes it to the public npm registry.
+# The version is derived from the release tag (v0.1.0 -> 0.1.0), and the spec
+# is generated from vibexp/vibexp at the same tag by default.
+#
+# The smoke type-check (npm run smoke, invoked by the build) is the generation
+# gate — if generation produced empty/broken output the job fails and nothing
+# is published.
+#
+# workflow_dispatch is kept as a manual override (e.g. first publish before the
+# backend is tagged: set backend_ref=main).
+#
+# Requires repo secret NPM_TOKEN (an npm automation token with publish rights
+# to the @vibexp scope).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'npm version to publish (default: derived from the release tag)'
+        required: false
+      backend_ref:
+        description: 'vibexp/vibexp git ref to generate from (default: the release tag)'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Generate, gate & publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve version & backend ref
+        id: resolve
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          IN_VERSION: ${{ inputs.version }}
+          IN_BACKEND_REF: ${{ inputs.backend_ref }}
+        run: |
+          version="${IN_VERSION:-${TAG#v}}"
+          backend_ref="${IN_BACKEND_REF:-${TAG}}"
+          if [ -z "$version" ] || [ -z "$backend_ref" ]; then
+            echo "::error::Could not resolve version/backend_ref. For a manual run, provide the 'version' and 'backend_ref' inputs."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "backend_ref=$backend_ref" >> "$GITHUB_OUTPUT"
+          echo "Publishing @vibexp/api-client@$version (spec from vibexp/vibexp@$backend_ref)"
+
+      - name: Checkout api-client
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+
+      - name: Checkout backend spec source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          repository: vibexp/vibexp
+          ref: ${{ steps.resolve.outputs.backend_ref }}
+          path: spec-src
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set package version
+        run: npm version "${{ steps.resolve.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      # Generates types + axios SDK, compiles to dist/, then type-checks smoke/
+      # against the generated output. This is the generation gate before publish.
+      - name: Generate, build & smoke type-check
+        run: npm run smoke
+        env:
+          VIBEXP_SPEC: spec-src/backend/openapi.yaml
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
