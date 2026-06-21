@@ -12,8 +12,9 @@ name: Publish
 # workflow_dispatch is kept as a manual override (e.g. first publish before the
 # backend is tagged: set backend_ref=main).
 #
-# Requires repo secret NPM_TOKEN (an npm automation token with publish rights
-# to the @vibexp scope).
+# Publishing uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret. The
+# package's npm settings must list this repo + workflow as a trusted publisher,
+# and the job needs `id-token: write`. Provenance is generated automatically.
 
 on:
   release:
@@ -29,6 +30,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # OIDC token for npm Trusted Publishing
 
 jobs:
   publish:
@@ -68,6 +70,11 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false   # never cache in release builds
+
+      # Trusted Publishing (OIDC) requires npm >= 11.5.1
+      - name: Ensure recent npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm install
@@ -82,7 +89,7 @@ jobs:
         env:
           VIBEXP_SPEC: spec-src/backend/openapi.yaml
 
+      # No NODE_AUTH_TOKEN: auth comes from the OIDC id-token (Trusted Publisher).
+      # Provenance attestation is generated automatically.
       - name: Publish to npm
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
