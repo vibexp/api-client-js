@@ -9,8 +9,10 @@ name: Publish
 # gate — if generation produced empty/broken output the job fails and nothing
 # is published.
 #
-# workflow_dispatch is kept as a manual override (e.g. first publish before the
-# backend is tagged: set backend_ref=main).
+# workflow_dispatch is both a manual override and the automation entrypoint:
+# vibexp's spec-change workflow dispatches this with backend_ref=main and no
+# version, which auto-resolves to the next patch bump (see the resolve step).
+# For a manual one-off, pass version + backend_ref explicitly.
 #
 # Publishing uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret. The
 # package's npm settings must list this repo + workflow as a trusted publisher,
@@ -22,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'npm version to publish (default: derived from the release tag)'
+        description: 'npm version to publish (default: release tag, else auto patch-bump)'
         required: false
       backend_ref:
         description: 'vibexp/vibexp git ref to generate from (default: the release tag)'
@@ -45,7 +47,22 @@ jobs:
           IN_VERSION: ${{ inputs.version }}
           IN_BACKEND_REF: ${{ inputs.backend_ref }}
         run: |
+          # Version precedence: explicit input > release tag > auto patch-bump.
+          # The auto path (empty version, no tag) is what vibexp's spec-change
+          # workflow_dispatch uses: bump the patch off the latest published
+          # version so every spec change lands as a new release with no human
+          # picking a number. Reading the latest version each run keeps
+          # back-to-back merges from colliding on the same version.
           version="${IN_VERSION:-${TAG#v}}"
+          if [ -z "$version" ]; then
+            latest="$(npm view @vibexp/api-client version 2>/dev/null || true)"
+            if [ -z "$latest" ]; then
+              echo "::error::Could not read the latest published @vibexp/api-client version for the auto patch-bump."
+              exit 1
+            fi
+            version="$(node -e 'const [a,b,c]=process.argv[1].split("."); if([a,b,c].some(x=>x===undefined||!/^\d+$/.test(x))){process.exit(1)} console.log(`${a}.${b}.${Number(c)+1}`)' "$latest")"
+            echo "Auto patch-bump: $latest -> $version"
+          fi
           backend_ref="${IN_BACKEND_REF:-${TAG}}"
           if [ -z "$version" ] || [ -z "$backend_ref" ]; then
             echo "::error::Could not resolve version/backend_ref. For a manual run, provide the 'version' and 'backend_ref' inputs."
