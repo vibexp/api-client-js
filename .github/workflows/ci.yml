@@ -49,3 +49,33 @@ jobs:
         run: npm run smoke
         env:
           VIBEXP_SPEC: spec-src/backend/openapi.yaml
+
+  # Non-blocking SonarCloud code-quality/security analysis of the hand-written
+  # source (generated code is excluded via sonar-project.properties — and is
+  # gitignored anyway, so it never reaches this job's checkout). The scan is
+  # source-based: no generation or build needed, so it runs independently of
+  # the generation gate above. continue-on-error keeps a red scan from ever
+  # blocking merges (issue #4; org rollout companion to vibexp/vibexp#300).
+  #
+  # NOTE: CI-based analysis is mutually exclusive with SonarCloud Automatic
+  # Analysis. Automatic Analysis must be disabled for `vibexp_api-client-js`
+  # in the SonarCloud UI (Administration -> Analysis Method) or the scan is
+  # rejected.
+  sonar:
+    name: Sonar Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          # Full history so SonarCloud can attribute new code / blame accurately.
+          fetch-depth: 0
+
+      - name: SonarCloud scan
+        continue-on-error: true
+        uses: sonarsource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f  # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
