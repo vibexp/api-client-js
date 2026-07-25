@@ -34,6 +34,20 @@ permissions:
   contents: read
   id-token: write   # OIDC token for npm Trusted Publishing
 
+# Serialize publishes repo-wide (constant group, no ref in it): several spec
+# changes landing on vibexp/vibexp back-to-back each dispatch this workflow, and
+# two publishes running at once would both read the same "latest published
+# version" in the resolve step and collide on the same npm version. Queueing
+# them means each run resolves its version after the previous one has published.
+# cancel-in-progress: false — never abort a publish that is already in flight.
+#
+# Note GitHub keeps only one *pending* run per group: if runs B and C queue
+# behind A, B is superseded by C. That is the behaviour we want here — every run
+# regenerates from the newest spec, so the newest queued run subsumes the older.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Generate, gate & publish
